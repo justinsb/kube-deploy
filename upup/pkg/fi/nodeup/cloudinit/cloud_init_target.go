@@ -36,9 +36,9 @@ var _ fi.Target = &CloudInitTarget{}
 type CloudConfig struct {
 	PackageUpdate bool `json:"package_update"`
 
-	Packages     []string           `json:"packages,omitempty"`
-	RunCommmands [][]string         `json:"runcmd,omitempty"`
-	WriteFiles   []*CloudConfigFile `json:"write_files,omitempty"`
+	Packages      []string           `json:"packages,omitempty"`
+	RunCommmands  [][]string         `json:"runcmd,omitempty"`
+	WriteFiles    []*CloudConfigFile `json:"write_files,omitempty"`
 }
 
 type CloudConfigFile struct {
@@ -111,7 +111,7 @@ func (t *CloudInitTarget) WriteFile(destPath string, contents fi.Resource, fileM
 		}
 
 		// Not a strict limit, just a sanity check
-		if len(d) > 256*1024 {
+		if len(d) > 256 * 1024 {
 			return fmt.Errorf("resource is very large (failed sanity-check): %v", contents)
 		}
 
@@ -123,19 +123,7 @@ func (t *CloudInitTarget) WriteFile(destPath string, contents fi.Resource, fileM
 }
 
 func (t *CloudInitTarget) Chown(path string, user, group string) {
-	t.AddCommand(Always, "chown", user+":"+group, path)
-}
-
-func stringSlicesEquals(l, r []string) bool {
-	if len(l) != len(r) {
-		return false
-	}
-	for i, v := range l {
-		if r[i] != v {
-			return false
-		}
-	}
-	return true
+	t.AddCommand(Always, "chown", user + ":" + group, path)
 }
 
 func (t *CloudInitTarget) AddCommand(addBehaviour AddBehaviour, args ...string) {
@@ -145,7 +133,7 @@ func (t *CloudInitTarget) AddCommand(addBehaviour AddBehaviour, args ...string) 
 
 	case Once:
 		for _, c := range t.Config.RunCommmands {
-			if stringSlicesEquals(args, c) {
+			if utils.StringSlicesEqual(args, c) {
 				glog.V(2).Infof("skipping pre-existing command because AddBehaviour=Once: %q", args)
 				return
 			}

@@ -1,0 +1,1 @@
+{{ BuildBootstrap "/usr/local/bin/kubelet" .Kubelet }}

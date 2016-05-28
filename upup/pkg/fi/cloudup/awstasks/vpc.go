@@ -10,6 +10,7 @@ import (
 	"k8s.io/kube-deploy/upup/pkg/fi/cloudup/awsup"
 )
 
+//go:generate fitask -type=VPC
 type VPC struct {
 	Name               *string
 	ID                 *string
@@ -18,15 +19,6 @@ type VPC struct {
 	EnableDNSSupport   *bool
 }
 
-var _ fi.CompareWithID = &VPC{}
-
-func (s *VPC) CompareWithID() *string {
-	return s.ID
-}
-
-func (e *VPC) String() string {
-	return fi.TaskAsString(e)
-}
 
 func (e *VPC) Find(c *fi.Context) (*VPC, error) {
 	cloud := c.Cloud.(*awsup.AWSCloud)
@@ -57,7 +49,7 @@ func (e *VPC) Find(c *fi.Context) (*VPC, error) {
 		Name: findNameTag(vpc.Tags),
 	}
 
-	glog.V(4).Infof("found matching VPC %v", actual.String())
+	glog.V(4).Infof("found matching VPC %v", actual)
 	e.ID = actual.ID
 
 	if actual.ID != nil {
@@ -141,5 +133,7 @@ func (_ *VPC) RenderAWS(t *awsup.AWSAPITarget, a, e, changes *VPC) error {
 		}
 	}
 
-	return t.AddAWSTags(*e.ID, t.Cloud.BuildTags(e.Name))
+	return t.AddAWSTags(*e.ID, t.Cloud.BuildTags(e.Name, nil))
 }
+
+

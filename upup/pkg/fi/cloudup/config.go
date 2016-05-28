@@ -5,77 +5,89 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strconv"
+	"github.com/golang/glog"
 )
 
 type CloudConfig struct {
-	CloudProvider string
+	CloudProvider                 string
 
 	// The version of kubernetes to install
-	KubernetesVersion string
+	KubernetesVersion             string
 
 	// The Node initializer technique to use: cloudinit or nodeup
-	NodeInit string
+	NodeInit                      string
 
-	InstancePrefix    string
-	ClusterName       string
-	AllocateNodeCIDRs bool
-	Zone              string
-	Region            string
-	Project           string
+	// The CIDR used for the AWS VPC / GCE Network, or otherwise allocated to k8s
+	// This is a real CIDR, not the internal k8s overlay
+	NetworkCIDR                   string
 
-	Multizone bool
+	// The DNS zone we should use when configuring DNS
+	DNSZone                       string
 
-	ClusterIPRange        string
-	ServiceClusterIPRange string
-	MasterIPRange         string
-	NonMasqueradeCidr     string
+	InstancePrefix                string
+	ClusterName                   string
+	AllocateNodeCIDRs             bool
+	Zones                         []string
+	MasterZones                   []string
+	NodeZones                     []string
+	Region                        string
+	Project                       string
 
-	NetworkProvider string
+	Multizone                     bool
 
-	HairpinMode string
+	ClusterIPRange                string
+	ServiceClusterIPRange         string
+	MasterIPRange                 string
+	NonMasqueradeCidr             string
 
-	OpencontrailTag           string
-	OpencontrailKubernetesTag string
-	OpencontrailPublicSubnet  string
+	NetworkProvider               string
 
-	EnableClusterMonitoring string
-	EnableL7LoadBalancing   string
-	EnableClusterUI         bool
+	HairpinMode                   string
 
-	EnableClusterDNS bool
-	DNSReplicas      int
-	DNSServerIP      string
-	DNSDomain        string
+	OpencontrailTag               string
+	OpencontrailKubernetesTag     string
+	OpencontrailPublicSubnet      string
 
-	EnableClusterLogging         bool
-	EnableNodeLogging            bool
-	LoggingDestination           string
-	ElasticsearchLoggingReplicas int
+	EnableClusterMonitoring       string
+	EnableL7LoadBalancing         string
+	EnableClusterUI               bool
 
-	EnableClusterRegistry   bool
-	ClusterRegistryDisk     string
-	ClusterRegistryDiskSize int
+	EnableClusterDNS              bool
+	DNSReplicas                   int
+	DNSServerIP                   string
+	DNSDomain                     string
 
-	EnableCustomMetrics bool
+	EnableClusterLogging          bool
+	EnableNodeLogging             bool
+	LoggingDestination            string
+	ElasticsearchLoggingReplicas  int
 
-	MasterName            string
-	RegisterMasterKubelet bool
-	MasterVolumeType      string
-	MasterVolumeSize      int
-	MasterTag             string
-	MasterInternalIP      string
-	MasterPublicIP        string
-	MasterMachineType     string
-	MasterImage           string
+	EnableClusterRegistry         bool
+	ClusterRegistryDisk           string
+	ClusterRegistryDiskSize       int
 
-	NodeImage          string
-	NodeCount          int
-	NodeInstancePrefix string
-	NodeLabels         string
-	NodeMachineType    string
-	NodeTag            string
+	EnableCustomMetrics           bool
 
-	KubeUser string
+	MasterInternalName            string
+
+	RegisterMasterKubelet         bool
+	MasterVolumeType              string
+	MasterVolumeSize              int
+	MasterTag                     string
+	MasterMachineType             string
+	MasterImage                   string
+	MasterPublicIP                string
+	MasterPublicName              string
+
+	NodeImage                     string
+	NodeCount                     int
+	NodeInstancePrefix            string
+	NodeLabels                    string
+	NodeMachineType               string
+	NodeTag                       string
+
+	KubeUser                      string
 
 	// These are moved to CAStore / SecretStore
 	//KubePassword			string
@@ -91,28 +103,28 @@ type CloudConfig struct {
 	//KubecfgCert                   []byte
 	//KubecfgKey                    []byte
 
-	AdmissionControl string
-	RuntimeConfig    string
+	AdmissionControl              string
+	RuntimeConfig                 string
 
-	KubeImageTag       string
-	KubeDockerRegistry string
-	KubeAddonRegistry  string
+	KubeImageTag                  string
+	KubeDockerRegistry            string
+	KubeAddonRegistry             string
 
-	KubeletPort int
+	KubeletPort                   int
 
-	KubeApiserverRequestTimeout int
+	KubeApiserverRequestTimeout   int
 
-	TerminatedPodGcThreshold string
+	TerminatedPodGcThreshold      string
 
-	EnableManifestURL bool
-	ManifestURL       string
-	ManifestURLHeader string
+	EnableManifestURL             bool
+	ManifestURL                   string
+	ManifestURLHeader             string
 
-	TestCluster string
+	TestCluster                   string
 
-	DockerOptions   string
-	DockerStorage   string
-	ExtraDockerOpts string
+	DockerOptions                 string
+	DockerStorage                 string
+	ExtraDockerOpts               string
 
 	E2EStorageTestEnvironment     string
 	KubeletTestArgs               string
@@ -128,11 +140,11 @@ type CloudConfig struct {
 	KubeProxyTestArgs             string
 	KubeProxyTestLogLevel         string
 
-	Assets []string
+	Assets                        []string
 
-	NodeUpTags []string
+	NodeUpTags                    []string
 
-	NodeUp NodeUpConfig
+	NodeUp                        NodeUpConfig
 }
 
 type NodeUpConfig struct {
@@ -164,11 +176,48 @@ func (c *CloudConfig) WellKnownServiceIP(id int) (net.IP, error) {
 		serviceIP := make(net.IP, len(ip6))
 		serviceIPBytes := serviceIPInt.Bytes()
 		for i := range serviceIPBytes {
-			serviceIP[len(serviceIP)-len(serviceIPBytes)+i] = serviceIPBytes[i]
+			serviceIP[len(serviceIP) - len(serviceIPBytes) + i] = serviceIPBytes[i]
 		}
 		return serviceIP, nil
 	}
 
 	return nil, fmt.Errorf("Unexpected IP address type for ServiceClusterIPRange: %s", c.ServiceClusterIPRange)
-
 }
+
+func (c *CloudConfig) SubnetCIDR(zone string) (string, error) {
+	index := -1
+	for i, z := range c.Zones {
+		if z == zone {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return "", fmt.Errorf("zone not configured: %q", zone)
+	}
+
+	_, cidr, err := net.ParseCIDR(c.NetworkCIDR)
+	if err != nil {
+		return "", fmt.Errorf("Invalid NetworkCIDR: %q", c.NetworkCIDR)
+	}
+
+	networkLength, _ := cidr.Mask.Size()
+
+	// We assume a maximum of 8 subnets per network
+	// TODO: Does this make sense on GCE?
+	networkLength += 3
+
+	ip4 := cidr.IP.To4()
+	if ip4 != nil {
+		n := binary.BigEndian.Uint32(ip4)
+		n += uint32(index) << uint(32 - networkLength)
+		subnetIP := make(net.IP, len(ip4))
+		binary.BigEndian.PutUint32(subnetIP, n)
+		subnetCIDR := subnetIP.String() + "/" + strconv.Itoa(networkLength)
+		glog.V(2).Infof("Computed CIDR for subnet in zone %q as %q", zone, subnetCIDR)
+		return subnetCIDR, nil
+	}
+
+	return "", fmt.Errorf("Unexpected IP address type for NetworkCIDR: %s", c.NetworkCIDR)
+}
+

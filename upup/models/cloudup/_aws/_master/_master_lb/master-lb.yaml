@@ -1,0 +1,34 @@
+# Configuration where an ELB fronts the master (apiservers in particular)
+
+# Master ELB
+loadBalancer/kubernetes-master-elb-{{ .ClusterName }}:
+  securityGroups:
+    - securityGroup/kubernetes-master-elb-{{ .ClusterName }}
+  subnets:
+{{ range $zone := .MasterZones }}
+    - subnet/kubernetes-{{ $zone }}-{{ $.ClusterName }}
+{{ end }}
+  listeners:
+    443: { instancePort: 443 }
+
+# Security group for master ELB
+securityGroup/kubernetes-master-elb-{{ .ClusterName }}:
+  vpc: vpc/kubernetes-{{ .ClusterName }}
+  description: 'Security group for ELB in front of masters'
+
+# HTTPS to the master ELB is allowed (for API access)
+securityGroupIngress/https-external-to-master:
+  securityGroup: securityGroup/kubernetes-master-elb-{{ .ClusterName }}
+  cidr: 0.0.0.0/0
+  protocol: tcp
+  fromPort: 443
+  toPort: 443
+
+# Allow HTTPS to the master from the master ELB
+securityGroupIngress/https-elb-to-master:
+  securityGroup: securityGroup/kubernetes-master-{{ .ClusterName }}
+  sourceGroup: securityGroup/kubernetes-master-elb-{{ .ClusterName }}
+  protocol: tcp
+  fromPort: 443
+  toPort: 443
+

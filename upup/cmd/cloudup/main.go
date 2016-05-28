@@ -37,8 +37,11 @@ func main() {
 	// TODO: Replace all these with a direct binding to the CloudConfig
 	// (we have plenty of reflection helpers if one isn't already available!)
 	config := &cloudup.CloudConfig{}
+
+	zones := strings.Join(config.Zones, ",")
+
 	flag.StringVar(&config.CloudProvider, "cloud", config.CloudProvider, "Cloud provider to use - gce, aws")
-	flag.StringVar(&config.Zone, "zone", config.Zone, "Cloud zone to target (warning - will be replaced by region)")
+	flag.StringVar(&zones, "zone", zones, "Cloud zone to target (warning - will be replaced by region)")
 	flag.StringVar(&config.Project, "project", config.Project, "Project to use (must be set on GCE)")
 	flag.StringVar(&config.ClusterName, "name", config.ClusterName, "Name for cluster")
 	flag.StringVar(&config.KubernetesVersion, "kubernetes-version", config.KubernetesVersion, "Version of kubernetes to run")
@@ -48,6 +51,11 @@ func main() {
 	flag.StringVar(&sshPublicKey, "ssh-public-key", sshPublicKey, "SSH public key to use")
 
 	flag.Parse()
+
+	config.Zones = strings.Split(zones, ",")
+
+	config.MasterZones = config.Zones
+	config.NodeZones = config.Zones
 
 	if dryrun {
 		target = "dryrun"
@@ -82,13 +90,13 @@ func main() {
 
 type CreateClusterCmd struct {
 	// Config is the cluster configuration
-	Config *cloudup.CloudConfig
+	Config       *cloudup.CloudConfig
 	// ModelDir is the directory in which the cloudup model is found
-	ModelDir string
+	ModelDir     string
 	// StateDir is a directory in which we store state (such as the PKI tree)
-	StateDir string
+	StateDir     string
 	// Target specifies how we are operating e.g. direct to GCE, or AWS, or dry-run, or terraform
-	Target string
+	Target       string
 	// The directory in which the node model is found
 	NodeModelDir string
 	// The SSH public key (file) to use
@@ -108,6 +116,19 @@ func (c *CreateClusterCmd) LoadConfig(configFile string) error {
 }
 
 func (c *CreateClusterCmd) Run() error {
+	// TODO: Make configurable (just accept the tags?)
+	useProtokube := true
+	useMasterLB := true
+	useHaMaster := true
+
+	if c.Config.MasterPublicName == "" {
+		c.Config.MasterPublicName = "api." + c.Config.ClusterName
+	}
+	if c.Config.DNSZone == "" {
+		tokens := strings.Split(c.Config.MasterPublicName, ".")
+		c.Config.DNSZone = strings.Join(tokens[len(tokens) - 2:], ".")
+	}
+
 	if c.StateDir == "" {
 		return fmt.Errorf("state dir is required")
 	}
@@ -146,6 +167,12 @@ func (c *CreateClusterCmd) Run() error {
 		c.Config.NodeUp.Location = location
 	}
 
+	if useProtokube {
+		location := "https://kubeupv2.s3.amazonaws.com/protokube/protokube.tar.gz"
+		glog.Infof("Using default protokube location: %q", location)
+		c.Config.Assets = append(c.Config.Assets, location)
+	}
+
 	var cloud fi.Cloud
 
 	var project string
@@ -154,6 +181,31 @@ func (c *CreateClusterCmd) Run() error {
 	checkExisting := true
 
 	c.Config.NodeUpTags = append(c.Config.NodeUpTags, "_jessie", "_debian_family", "_systemd")
+
+	if useProtokube {
+		tags["_protokube"] = struct{}{}
+		c.Config.NodeUpTags = append(c.Config.NodeUpTags, "_protokube")
+	} else {
+		tags["_not_protokube"] = struct{}{}
+		c.Config.NodeUpTags = append(c.Config.NodeUpTags, "_not_protokube")
+	}
+
+	tags["_master"] = struct{}{}
+	if useHaMaster {
+		tags["_master_ha"] = struct{}{}
+	} else {
+		tags["_master_single"] = struct{}{}
+	}
+
+	if useMasterLB {
+		tags["_master_lb"] = struct{}{}
+	} else {
+		tags["_not_master_lb"] = struct{}{}
+	}
+
+	if c.Config.MasterPublicName != "" {
+		tags["_master_dns"] = struct{}{}
+	}
 
 	l.AddTypes(map[string]interface{}{
 		"keypair": &fitasks.Keypair{},
@@ -177,7 +229,10 @@ func (c *CreateClusterCmd) Run() error {
 
 			// For now a zone to be specified...
 			// This will be replace with a region when we go full HA
-			zone := c.Config.Zone
+			if len(c.Config.Zones) != 1 {
+				return fmt.Errorf("Must specify a single zone (use -zone)")
+			}
+			zone := c.Config.Zones[0]
 			if zone == "" {
 				return fmt.Errorf("Must specify a zone (use -zone)")
 			}
@@ -204,46 +259,67 @@ func (c *CreateClusterCmd) Run() error {
 			c.Config.NodeUpTags = append(c.Config.NodeUpTags, "_aws")
 
 			l.AddTypes(map[string]interface{}{
-				"autoscalingGroup":            &awstasks.AutoscalingGroup{},
-				"dhcpOptions":                 &awstasks.DHCPOptions{},
+				// EC2
 				"elasticIP":                   &awstasks.ElasticIP{},
-				"iamInstanceProfile":          &awstasks.IAMInstanceProfile{},
-				"iamInstanceProfileRole":      &awstasks.IAMInstanceProfileRole{},
-				"iamRole":                     &awstasks.IAMRole{},
-				"iamRolePolicy":               &awstasks.IAMRolePolicy{},
 				"instance":                    &awstasks.Instance{},
 				"instanceElasticIPAttachment": &awstasks.InstanceElasticIPAttachment{},
 				"instanceVolumeAttachment":    &awstasks.InstanceVolumeAttachment{},
+				"ebsVolume":                   &awstasks.EBSVolume{},
+				"sshKey":                      &awstasks.SSHKey{},
+
+				// VPC / Networking
+				"dhcpOptions":                 &awstasks.DHCPOptions{},
 				"internetGateway":             &awstasks.InternetGateway{},
 				"internetGatewayAttachment":   &awstasks.InternetGatewayAttachment{},
-				"ebsVolume":                   &awstasks.EBSVolume{},
 				"route":                       &awstasks.Route{},
 				"routeTable":                  &awstasks.RouteTable{},
 				"routeTableAssociation":       &awstasks.RouteTableAssociation{},
 				"securityGroup":               &awstasks.SecurityGroup{},
 				"securityGroupIngress":        &awstasks.SecurityGroupIngress{},
-				"sshKey":                      &awstasks.SSHKey{},
 				"subnet":                      &awstasks.Subnet{},
 				"vpc":                         &awstasks.VPC{},
 				"vpcDHDCPOptionsAssociation": &awstasks.VPCDHCPOptionsAssociation{},
+
+				// ELB
+				"loadBalancer": &awstasks.LoadBalancer{},
+				"loadBalancerAttachment": &awstasks.LoadBalancerAttachment{},
+				"loadBalancerListener": &awstasks.LoadBalancerListener{},
+
+				// IAM
+				"iamInstanceProfile":          &awstasks.IAMInstanceProfile{},
+				"iamInstanceProfileRole":      &awstasks.IAMInstanceProfileRole{},
+				"iamRole":                     &awstasks.IAMRole{},
+				"iamRolePolicy":               &awstasks.IAMRolePolicy{},
+
+				// Autoscaling
+				"autoscalingGroup":            &awstasks.AutoscalingGroup{},
+
+				// Route53
+				"dnsName":            &awstasks.DNSName{},
+				"dnsZone":            &awstasks.DNSZone{},
 			})
 
-			// For now a zone to be specified...
-			// This will be replace with a region when we go full HA
-			zone := c.Config.Zone
-			if zone == "" {
+			// TODO: Auto choose zones from a region
+
+			if len(c.Config.Zones) == 0 {
 				return fmt.Errorf("Must specify a zone (use -zone)")
 			}
-			if len(zone) <= 2 {
-				return fmt.Errorf("Invalid AWS zone: %v", zone)
+
+			for _, zone := range c.Config.Zones {
+				if len(zone) <= 2 {
+					return fmt.Errorf("Invalid AWS zone: %q", zone)
+				}
+
+				region = zone[:len(zone) - 1]
+				if c.Config.Region != "" && c.Config.Region != region {
+					return fmt.Errorf("Clusters cannot span multiple regions")
+				}
+				c.Config.Region = region
 			}
 
 			if c.SSHPublicKey == "" {
 				return fmt.Errorf("SSH public key must be specified when running with AWS")
 			}
-
-			region := zone[:len(zone)-1]
-			c.Config.Region = region
 
 			if c.Config.ClusterName == "" {
 				return fmt.Errorf("ClusterName is required for AWS")
@@ -294,7 +370,7 @@ func (c *CreateClusterCmd) Run() error {
 		return fmt.Errorf("ClusterName is required")
 	}
 
-	if c.Config.Zone == "" {
+	if len(c.Config.Zones) == 0 {
 		return fmt.Errorf("Zone is required")
 	}
 

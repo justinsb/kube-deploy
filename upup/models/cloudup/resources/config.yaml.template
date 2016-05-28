@@ -11,6 +11,8 @@ APIServer:
   Certificate: {{ Base64Encode (CA.Cert "master").AsString }}
   Key: {{ Base64Encode (CA.PrivateKey "master").AsString }}
 
+MasterInternalName: {{ .MasterInternalName }}
+
 KubeUser: {{ .KubeUser }}
 KubePassword: {{ (Secrets.Secret "kube").AsString }}
 

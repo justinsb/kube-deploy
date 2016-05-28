@@ -1,5 +1,5 @@
 vpc/kubernetes-{{ .ClusterName }}:
-  cidr: 172.20.0.0/16
+  cidr: {{ .NetworkCIDR }}
   enableDnsSupport: true
   enableDnsHostnames: true
 
@@ -15,14 +15,7 @@ vpcDHDCPOptionsAssociation/kubernetes-{{ .ClusterName }}:
   vpc: vpc/kubernetes-{{ .ClusterName }}
   dhcpOptions: dhcpOptions/kubernetes-{{ .ClusterName }}
 
-subnet/kubernetes-{{ .ClusterName }}-{{ .Zone }}:
-  vpc: vpc/kubernetes-{{ .ClusterName }}
-  availabilityZone: {{ .Zone}}
-  cidr: 172.20.0.0/24
-
-internetGateway/kubernetes-{{ .ClusterName }}:
-  # Just so we have something to set
-  name: kubernetes-{{ .ClusterName }}
+internetGateway/kubernetes-{{ .ClusterName }}: {}
 
 internetGatewayAttachment/kubernetes-{{ .ClusterName }}:
   internetGateway: internetGateway/kubernetes-{{ .ClusterName }}
@@ -31,12 +24,21 @@ internetGatewayAttachment/kubernetes-{{ .ClusterName }}:
 routeTable/kubernetes-{{ .ClusterName }}:
   vpc: vpc/kubernetes-{{ .ClusterName }}
 
+{{ range $zone := .Zones }}
+
+subnet/kubernetes-{{ $zone }}-{{ $.ClusterName }}:
+  vpc: vpc/kubernetes-{{ $.ClusterName }}
+  availabilityZone: {{ $zone}}
+  cidr: {{ $.SubnetCIDR $zone }} #172.20.0.0/24
+
+routeTableAssociation/kubernetes-{{ $zone }}-{{ $.ClusterName }}:
+  routeTable: routeTable/kubernetes-{{ $.ClusterName }}
+  subnet: subnet/kubernetes-{{ $zone }}-{{ $.ClusterName }}
+
+{{ end }}
+
 route/0.0.0.0/0:
   routeTable: routeTable/kubernetes-{{ .ClusterName }}
   cidr: 0.0.0.0/0
   internetGateway: internetGateway/kubernetes-{{ .ClusterName }}
-
-routeTableAssociation/kubernetes-{{ .ClusterName }}:
-  routeTable: routeTable/kubernetes-{{ .ClusterName }}
-  subnet: subnet/kubernetes-{{ .ClusterName }}-{{ .Zone }}
 

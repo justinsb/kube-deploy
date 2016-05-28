@@ -21,6 +21,8 @@ type NodeConfig struct {
 
 	Tags   []string
 	Assets []string
+
+	MasterInternalName string
 }
 
 // A helper so that templates can get tokens which are not valid identifiers
@@ -67,14 +69,14 @@ type KubeletConfig struct {
 }
 
 type KubeProxyConfig struct {
-	Master string `flag:"master"`
 	// TODO: Name verbosity or LogLevel
 	LogLevel int `flag:"v"`
-
 	// TODO: Better type ?
 	CPURequest string // e.g. "20m"
-
 	Image string
+
+	// Configuration flags
+	Master string `flag:"master"`
 }
 
 type DockerConfig struct {

@@ -1,0 +1,14 @@
+# Configuration for a DNS name for the master
+
+dnsZone/{{ .DNSZone }}: {}
+
+{{ if HasTag "_master_lb" }}
+
+# Master name -> ELB
+dnsName/{{ .MasterPublicName }}:
+  Zone: dnsZone/{{ .DNSZone }}
+  ResourceType: "ALIAS"
+  TargetLoadBalancer: loadBalancer/kubernetes-master-elb-{{ .ClusterName }}
+
+{{ end }}
+

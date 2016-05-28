@@ -1,0 +1,8 @@
+[Unit]
+Description=Kubernetes Kubelet Server
+Documentation=https://github.com/kubernetes/kubernetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/kubelet
+ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
+Restart=always

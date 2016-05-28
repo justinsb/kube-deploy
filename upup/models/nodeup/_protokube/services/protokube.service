@@ -1,0 +1,10 @@
+[Unit]
+Description=Kubernetes Protokube Service
+Documentation=https://github.com/kubernetes/kube-deploy/protokube
+
+[Service]
+ExecStart=/usr/local/bin/protokube
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

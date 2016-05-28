@@ -7,22 +7,16 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kube-deploy/upup/pkg/fi"
 	"k8s.io/kube-deploy/upup/pkg/fi/cloudup/awsup"
+	"k8s.io/kube-deploy/upup/pkg/fi/utils"
 )
 
+//go:generate fitask -type=Subnet
 type Subnet struct {
 	Name             *string
 	ID               *string
 	VPC              *VPC
 	AvailabilityZone *string
 	CIDR             *string
-}
-
-func (s *Subnet) CompareWithID() *string {
-	return s.ID
-}
-
-func (e *Subnet) String() string {
-	return fi.TaskAsString(e)
 }
 
 func (e *Subnet) Find(c *fi.Context) (*Subnet, error) {
@@ -113,5 +107,19 @@ func (_ *Subnet) RenderAWS(t *awsup.AWSAPITarget, a, e, changes *Subnet) error {
 		e.ID = response.Subnet.SubnetId
 	}
 
-	return t.AddAWSTags(*e.ID, t.Cloud.BuildTags(e.Name))
+	return t.AddAWSTags(*e.ID, t.Cloud.BuildTags(e.Name, nil))
 }
+
+func subnetSlicesEqualIgnoreOrder(l, r []*Subnet) bool {
+	var lIDs []string
+	for _, s := range l {
+		lIDs = append(lIDs, *s.ID)
+	}
+	var rIDs []string
+	for _, s := range r {
+		rIDs = append(rIDs, *s.ID)
+	}
+	return utils.StringSlicesEqualIgnoreOrder(lIDs, rIDs)
+}
+
+

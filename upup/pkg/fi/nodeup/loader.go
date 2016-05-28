@@ -19,8 +19,8 @@ type Loader struct {
 	optionsLoader *loader.OptionsLoader
 	config        *NodeConfig
 
-	assets *fi.AssetStore
-	tasks  map[string]fi.Task
+	assets        *fi.AssetStore
+	tasks         map[string]fi.Task
 }
 
 func NewLoader(config *NodeConfig, assets *fi.AssetStore) *Loader {
@@ -33,11 +33,17 @@ func NewLoader(config *NodeConfig, assets *fi.AssetStore) *Loader {
 	return l
 }
 
+// TODO: Import from protokube (or shared place)
+type BootstrapTask struct {
+	Command []string `json:"command"`
+}
+
 func (l *Loader) executeTemplate(key string, d string) (string, error) {
 	t := template.New(key)
 
 	funcMap := make(template.FuncMap)
 	funcMap["BuildFlags"] = buildFlags
+	funcMap["BuildBootstrap"] = buildBootstrap
 	funcMap["Base64Encode"] = func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	}
@@ -202,7 +208,7 @@ func (r *Loader) handleFile(i *loader.TreeWalkItem) error {
 		} else {
 			contents = fi.NewFileResource(i.Path)
 		}
-		task, err = nodetasks.NewFileTask(i.Name, contents, "/"+i.RelativePath, i.Meta)
+		task, err = nodetasks.NewFileTask(i.Name, contents, "/" + i.RelativePath, i.Meta)
 	}
 
 	if task.Type == "" {

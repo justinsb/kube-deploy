@@ -1,5 +1,8 @@
-gocode: godeps
+gocode: codegen
 	go install k8s.io/kube-deploy/upup/cmd/...
+
+codegen:
+	go generate k8s.io/kube-deploy/upup/pkg/fi/cloudup/awstasks
 
 godeps:
 	# I think strip-vendor is the workaround for 25572

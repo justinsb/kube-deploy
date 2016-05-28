@@ -7,9 +7,36 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"encoding/json"
 )
 
+// buildFlags is a template helper, which builds a string containing the flags to be passed to a command
 func buildFlags(options interface{}) (string, error) {
+	flags, err := buildFlagsSlice(options)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(flags, " "), nil
+}
+
+// BuildBootstrap is a template helper, whcih builds a BootstrapTask for use with protokube
+func buildBootstrap(command string, options interface{}) (string, error) {
+	flags, err := buildFlagsSlice(options)
+	if err != nil {
+		return "", err
+	}
+	t := &BootstrapTask{}
+	t.Command = append(t.Command, command)
+	t.Command = append(t.Command, flags...)
+
+	j, err := json.MarshalIndent(t, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("error marshaling to json: %v", err)
+	}
+	return string(j), nil
+}
+
+func buildFlagsSlice(options interface{}) ([]string, error) {
 	var flags []string
 
 	walker := func(path string, field *reflect.StructField, val reflect.Value) error {
@@ -53,10 +80,10 @@ func buildFlags(options interface{}) (string, error) {
 	}
 	err := utils.ReflectRecursive(reflect.ValueOf(options), walker)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// Sort so that the order is stable across runs
 	sort.Strings(flags)
 
-	return strings.Join(flags, " "), nil
+	return flags, nil
 }

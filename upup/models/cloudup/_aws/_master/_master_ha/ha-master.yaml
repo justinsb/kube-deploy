@@ -1,0 +1,33 @@
+{{ range $zone := .MasterZones }}
+
+# ASG for master
+autoscalingGroup/kubernetes-master-{{ $zone }}-{{ $.ClusterName }}:
+  minSize: 1
+  maxSize: 1
+  subnets:
+    - subnet/kubernetes-{{ $zone }}-{{ $.ClusterName }}
+  tags:
+    k8s.io/role/master: "1"
+  sshKey: sshKey/kubernetes-{{ $.ClusterName }}
+  securityGroups:
+    - securityGroup/kubernetes-master-{{ $.ClusterName }}
+  iamInstanceProfile: iamInstanceProfile/kubernetes-master-{{ $.ClusterName }}
+  imageId: {{ $.MasterImage }}
+  instanceType: {{ $.MasterMachineType }}
+  associatePublicIP: true
+  userData: resources/nodeup.sh _kubernetes_master
+  blockDeviceMappings:
+    # Map all the ephemeral devices
+    {{ range $d := (MachineTypeInfo $.MasterMachineType).EphemeralDevices }}
+    - DeviceName: {{ $d.DeviceName }}
+      VirtualName: {{ $d.VirtualName }}
+    {{ end }}
+
+{{ if HasTag "_master_lb" }}
+# Attach ASG to ELB
+loadBalancerAttachment/kubernetes-master-{{ $zone }}-{{ $.ClusterName }}:
+  loadBalancer: loadBalancer/kubernetes-master-elb-{{ $.ClusterName }}
+  autoscalingGroup: autoscalingGroup/kubernetes-master-{{ $zone }}-{{ $.ClusterName }}
+{{ end }}
+
+{{ end }}
