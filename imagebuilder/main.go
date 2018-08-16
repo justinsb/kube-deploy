@@ -37,7 +37,6 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/storage/v1"
 	"k8s.io/kube-deploy/imagebuilder/pkg/imagebuilder"
 	"k8s.io/kube-deploy/imagebuilder/pkg/imagebuilder/executor"
 )
