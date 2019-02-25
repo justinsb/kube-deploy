@@ -38,6 +38,9 @@ func (c *Config) InitDefaults() {
 		"sudo apt-get update",
 		"sudo apt-get install --yes git python debootstrap python-pip kpartx parted",
 		"sudo pip install --upgrade requests termcolor jsonschema fysom docopt pyyaml boto boto3",
+		//		"sudo apt-get install --yes git python debootstrap kpartx parted",
+		//		// Install using packages; installation from pip simply breaks too often
+		//		"sudo apt-get install --yes python-docopt python-yaml python-jsonschema python-fysom python-boto3",
 	}
 	for _, cmd := range setupCommands {
 		c.SetupCommands = append(c.SetupCommands, strings.Split(cmd, " "))
