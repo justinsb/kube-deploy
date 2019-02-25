@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -188,8 +189,14 @@ func main() {
 			glog.Fatalf("Instance was not found (specify --up?)")
 		}
 
+		validateHostKey := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			glog.Infof("accepting host key %s for %s", key, hostname)
+			return nil
+		}
+
 		sshConfig := &ssh.ClientConfig{
-			User: config.SSHUsername,
+			User:            config.SSHUsername,
+			HostKeyCallback: validateHostKey,
 		}
 
 		if !*flagLocalhost {
