@@ -1,0 +1,24 @@
+---
+name: debian-{system.release}-{system.architecture}-{%Y}{%m}{%d}
+provider:
+  name: oracle
+bootstrapper:
+  workspace: /target
+system:
+  release: jessie
+  architecture: amd64
+  bootloader: grub
+  charmap: UTF-8
+  locale: en_US
+  timezone: UTC
+volume:
+  backing: raw
+  partitions:
+    type: msdos
+    root:
+      filesystem: ext4
+      size: 8GiB
+plugins:
+  cloud_init:
+    username: opc
+    metadata_sources: Ec2

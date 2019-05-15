@@ -1,0 +1,12 @@
+---
+# This is a mapping of Debian release codenames to processor architectures to kernel packages
+wheezy:
+  amd64: linux-image-amd64
+jessie:
+  amd64: linux-image-amd64
+stretch:
+  amd64: linux-image-amd64
+buster:
+  amd64: linux-image-amd64
+sid:
+  amd64: linux-image-amd64

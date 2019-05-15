@@ -1,0 +1,32 @@
+---
+name: debian-{system.release}-{system.architecture}-{%y}{%m}{%d}
+provider:
+  name: azure
+  waagent:
+    version: 2.0.14
+bootstrapper:
+  mirror: http://deb.debian.org/debian/
+  workspace: /target
+system:
+  release: jessie
+  architecture: amd64
+  bootloader: grub
+  charmap: UTF-8
+  locale: en_US
+  timezone: UTC
+volume:
+  backing: vhd
+  partitions:
+    type: msdos
+    root:
+      filesystem: ext4
+      size: 10GiB
+packages:
+  components:
+  - main
+  - contrib
+  - non-free
+plugins:
+  ntp:
+    servers:
+    - time.windows.com

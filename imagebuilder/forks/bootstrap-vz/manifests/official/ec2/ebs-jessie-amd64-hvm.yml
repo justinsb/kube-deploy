@@ -1,0 +1,60 @@
+---
+name: debian-{system.release}-{system.architecture}-{provider.virtualization}-{%Y}-{%m}-{%d}-{%H}{%M}-ebs
+tags:
+  Name: "Jessie 8.6+1"
+  Debian: "8.6+{%Y}{%m}{%d}"
+provider:
+  name: ec2
+  virtualization: hvm
+  enhanced_networking: simple
+  # credentials:
+  #   access-key: AFAKEACCESSKEYFORAWS
+  #   secret-key: thes3cr3tkeyf0ryourawsaccount/FS4d8Qdva
+  description: Debian {system.release} {system.architecture}
+bootstrapper:
+  workspace: /target
+system:
+  release: jessie
+  architecture: amd64
+  bootloader: grub
+  charmap: UTF-8
+  locale: en_US
+  timezone: UTC
+volume:
+  backing: ebs
+  partitions:
+    type: gpt
+    root:
+      filesystem: ext4
+      size: 8GiB
+packages:
+  mirror: http://cloudfront.debian.net/debian
+  components:
+    - main
+    - contrib
+    - non-free
+  preferences:
+    backport-cloud-init-cloud-utils:
+      - package: cloud-init cloud-utils
+        pin: release n=jessie-backports
+        pin-priority: 500
+  install:
+    - awscli
+    - python-boto
+    - python3-boto
+    - apt-transport-https
+    - lvm2
+    - ncurses-term
+    - parted
+    - cloud-init
+    - cloud-utils
+    - gdisk
+    - systemd
+    - systemd-sysv
+plugins:
+  cloud_init:
+    metadata_sources: Ec2
+    username: admin
+    enable_modules:
+      cloud_init_modules:
+        - {module: growpart, position: 4}

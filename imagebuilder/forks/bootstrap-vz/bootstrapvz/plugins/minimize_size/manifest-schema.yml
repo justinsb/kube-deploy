@@ -1,0 +1,39 @@
+---
+$schema: http://json-schema.org/draft-04/schema#
+properties:
+  plugins:
+    properties:
+      minimize_size:
+        properties:
+          shrink:
+            type: boolean
+          zerofree:
+            type: boolean
+          apt:
+            type: object
+            properties:
+              autoclean:
+                type: boolean
+              languages:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              gzip_indexes:
+                type: boolean
+              autoremove_suggests:
+                type: boolean
+          dpkg:
+            type: object
+            properties:
+              locales:
+                type: array
+                items:
+                  type: string
+              exclude_docs:
+                type: boolean
+        type: object
+        additionalProperties: false
+    type: object
+title: Minimize size plugin manifest
+type: object

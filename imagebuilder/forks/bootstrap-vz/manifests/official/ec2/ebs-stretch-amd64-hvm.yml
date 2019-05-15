@@ -1,0 +1,66 @@
+---
+name: debian-{system.release}-{system.architecture}-{provider.virtualization}-{%Y}-{%m}-{%d}-{%H}{%M}-ebs
+tags:
+  Name: "Stretch 9.0 alpha"
+  Debian: "9.0~{%Y}{%m}{%d}{%H}{%M}"
+provider:
+  name: ec2
+  virtualization: hvm
+  enhanced_networking: simple
+  # credentials:
+  #   access-key: AFAKEACCESSKEYFORAWS
+  #   secret-key: thes3cr3tkeyf0ryourawsaccount/FS4d8Qdva
+  description: Debian {system.release} {system.architecture}
+bootstrapper:
+  workspace: /target
+system:
+  release: stretch
+  architecture: amd64
+  bootloader: grub
+  charmap: UTF-8
+  locale: en_US
+  timezone: UTC
+volume:
+  backing: ebs
+  partitions:
+    type: gpt
+    root:
+      filesystem: ext4
+      size: 8GiB
+packages:
+  mirror: http://cloudfront.debian.net/debian
+  components:
+    - main
+    - contrib
+    - non-free
+  install:
+    - awscli
+    - python-boto
+    - python3-boto
+    - apt-transport-https
+    - lvm2
+    - ncurses-term
+    - parted
+    - cloud-init
+    - cloud-utils
+    - gdisk
+    - systemd
+    - systemd-sysv
+plugins:
+  cloud_init:
+    metadata_sources: Ec2
+    username: admin
+    enable_modules:
+      cloud_init_modules:
+        - {module: growpart, position: 4}
+#  ec2_launch:
+#    security_group_ids:
+#      # this have to be a NONE VPC SG
+#      - sg-398a704f
+#    instance_type: m3.medium
+#    ssh_key: my_ssh_key
+#    print_public_ip: "/tmp/stretch-ami-test-ip"
+#    tags:
+#      Name: "testing-ami-{system.release}"
+#      Debian: "9.0~{%Y}{%m}{%d}{%H}{%M}"
+#    deregister_ami: false

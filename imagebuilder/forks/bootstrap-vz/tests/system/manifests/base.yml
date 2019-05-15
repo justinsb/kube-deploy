@@ -1,0 +1,13 @@
+---
+name: deb-{system.release}-{system.architecture}-{system.bootloader}-{volume.partitions.type}-{%y}{%m}{%d}
+provider: {}
+bootstrapper:
+  workspace: /target
+  tarball: true
+system:
+  charmap: UTF-8
+  locale: en_US
+  timezone: UTC
+volume:
+  partitions: {}
+packages: {}

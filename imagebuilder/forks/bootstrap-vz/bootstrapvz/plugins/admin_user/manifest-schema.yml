@@ -1,0 +1,20 @@
+---
+$schema: http://json-schema.org/draft-04/schema#
+title: Admin user plugin manifest
+type: object
+properties:
+  plugins:
+    type: object
+    properties:
+      admin_user:
+        type: object
+        properties:
+          username: {type: string}
+          password: {type: string}
+          pubkey: {$ref: '#/definitions/path'}
+        required: [username]
+        additionalProperties: false
+definitions:
+  path:
+    pattern: ^[^\0]+$
+    type: string

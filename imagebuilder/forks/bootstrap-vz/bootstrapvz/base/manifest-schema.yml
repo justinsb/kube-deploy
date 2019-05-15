@@ -1,0 +1,208 @@
+---
+$schema: http://json-schema.org/draft-04/schema#
+title: Generic manifest
+type: object
+required: [name, provider, bootstrapper, system, volume]
+properties:
+  name:
+    type: string
+  provider:
+    type: object
+    properties:
+      name: {type: string}
+    required: [name]
+    additionalProperties: true
+  bootstrapper:
+    type: object
+    properties:
+      exclude_packages:
+        type: array
+        items:
+          type: string
+          pattern: '^[^/]+$'
+        minItems: 1
+      include_packages:
+        type: array
+        items:
+          type: string
+          pattern: '^[^/]+$'
+        minItems: 1
+      mirror:
+        type: string
+        format: uri
+      tarball: {type: boolean}
+      workspace:
+        $ref: '#/definitions/path'
+      variant:
+        type: string
+        enum: [minbase]
+    required: [workspace]
+    additionalProperties: false
+  system:
+    type: object
+    properties:
+      architecture:
+        enum: [i386, amd64, arm64]
+      userspace_architecture:
+        enum: [i386]
+      bootloader:
+        enum:
+          - pvgrub
+          - grub
+          - extlinux
+          - none
+      charmap: {type: string}
+      hostname:
+        type: string
+        pattern: ^\S+$
+      locale: {type: string}
+      release: {type: string}
+      timezone: {type: string}
+    required:
+      - release
+      - architecture
+      - bootloader
+      - timezone
+      - locale
+      - charmap
+    additionalProperties: false
+  packages:
+    type: object
+    properties:
+      components:
+        type: array
+        items: {type: string}
+        minItems: 1
+      install:
+        type: array
+        items:
+          anyOf:
+            - pattern: ^[^/]+(/[^/]+)?$
+            - $ref: '#/definitions/absolute_path'
+        minItems: 1
+      install_standard: {type: boolean}
+      mirror:
+        type: string
+        format: uri
+      preferences:
+        type: object
+        patternProperties:
+          ^[^/\0]+$:
+            type: array
+            items:
+              type: object
+              properties:
+                package: {type: string}
+                pin: {type: string}
+                pin-priority: {type: integer}
+              required: [pin, package, pin-priority]
+              additionalProperties: false
+            minItems: 1
+        minProperties: 1
+        additionalProperties: false
+      apt.conf.d:
+        type: object
+        patternProperties:
+          ^[0-9A-Za-z][0-9A-Za-z-_.]+$:
+            type: string
+        minProperties: 1
+        additionalProperties: false
+      sources:
+        type: object
+        patternProperties:
+          ^[^/\0]+$:
+            items:
+              type: string
+              pattern: ^(deb|deb-src)\s+(\[\s*(.+\S)?\s*\]\s+)?\S+\s+\S+(\s+(.+\S))?\s*$
+            minItems: 1
+            type: array
+        minProperties: 1
+        additionalProperties: false
+      trusted-keys:
+        type: array
+        items:
+          $ref: '#/definitions/path'
+        minItems: 1
+      include-source-type: {type: boolean}
+    additionalProperties: false
+  plugins:
+    type: object
+    patternProperties:
+      ^\w+$: {}
+    additionalProperties: false
+  volume:
+    type: object
+    oneOf:
+        - $ref: '#/definitions/standardvolume'
+        - $ref: '#/definitions/logicalvolume'
+definitions:
+  standardvolume:
+    type: object
+    properties:
+      backing: {type: string}
+      partitions:
+        type: object
+        oneOf:
+          - $ref: '#/definitions/no_partitions'
+          - $ref: '#/definitions/partition_table'
+    required: [partitions]
+    additionalProperties: false
+  logicalvolume:
+    type: object
+    properties:
+      backing:
+        enum: [lvm]
+      volumegroup : {type: string}
+      logicalvolume: {type: string}
+      partitions:
+        type: object
+        oneOf:
+          - $ref: '#/definitions/no_partitions'
+          - $ref: '#/definitions/partition_table'
+    required: [partitions]
+    additionalProperties: false
+  absolute_path:
+    type: string
+    pattern: ^/[^\0]+$
+  bytes:
+    pattern: ^\d+([KMGT]i?B|B)$
+    type: string
+  no_partitions:
+    type: object
+    properties:
+      root: {$ref: '#/definitions/partition'}
+      type: {enum: [none]}
+    required: [type, root]
+    additionalProperties: false
+  partition:
+    type: object
+    properties:
+      filesystem:
+        enum: [ext2, ext3, ext4, xfs, btrfs]
+      format_command:
+        items: {type: string}
+        minItems: 1
+        type: array
+      mountopts:
+        items: {type: string}
+        minItems: 1
+        type: array
+      size: {$ref: '#/definitions/bytes'}
+    required: [size, filesystem]
+    additionalProperties: false
+  partition_table:
+    type: object
+    patternProperties:
+      ^(?!type|swap).*: {$ref: '#/definitions/partition'}
+    properties:
+      swap:
+        type: object
+        properties:
+          size: {$ref: '#/definitions/bytes'}
+        required: [size]
+      type: {enum: [msdos, gpt]}
+    required: [type, root]
+    additionalProperties: false
+  path:
+    type: string
+    pattern: ^[^\0]+$
