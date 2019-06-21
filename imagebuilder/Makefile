@@ -1,7 +1,7 @@
 all: gocode
 
 gocode:
-	go install k8s.io/kube-deploy/imagebuilder
+	GO111MODULE=on go install k8s.io/kube-deploy/imagebuilder
 
 gofmt:
 	gofmt -w -s main.go
